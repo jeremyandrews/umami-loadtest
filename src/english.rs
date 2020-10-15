@@ -78,3 +78,10 @@ pub async fn page_by_nid(user: &GooseUser) -> GooseTaskResult {
 
     Ok(())
 }
+
+// @TODO: load contact form, post feedback: /en/contact
+//        Website feedback
+
+// @TODO: search up content, load from results
+
+// @TODO: view listing by taxonomy term: ie /en/tags/egg

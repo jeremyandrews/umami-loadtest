@@ -57,3 +57,10 @@ pub async fn basic_page_es(user: &GooseUser) -> GooseTaskResult {
 
     Ok(())
 }
+
+// @TODO: load contact form, post feedback: /es/contact
+//        Comentarios sobre el sitio web
+
+// @TODO: search up content, load from results
+
+// @TODO: view listing by taxonomy term: ie /es/tags/huevo
