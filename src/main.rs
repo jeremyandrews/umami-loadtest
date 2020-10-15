@@ -29,14 +29,16 @@ fn main() -> Result<(), GooseError> {
         .register_taskset(
             taskset!("Anonymous English user")
                 .register_task(task!(front_page_en).set_name("anon /").set_weight(2)?)
+                .register_task(task!(article_listing_en).set_name("anon /en/articles/"))
                 .register_task(
-                    task!(article_page_en)
-                        .set_name("anon /en/article")
+                    task!(article_en)
+                        .set_name("anon /en/articles/%")
                         .set_weight(2)?,
                 )
+                .register_task(task!(recipe_listing_en).set_name("anon /en/recipes/"))
                 .register_task(
-                    task!(recipe_page_en)
-                        .set_name("anon /en/recipe")
+                    task!(recipe_en)
+                        .set_name("anon /en/recipes/%")
                         .set_weight(4)?,
                 )
                 .register_task(task!(basic_page_en).set_name("anon /en/basicpage"))
@@ -46,17 +48,20 @@ fn main() -> Result<(), GooseError> {
         .register_taskset(
             taskset!("Anonymous Spanish user")
                 .register_task(task!(front_page_es).set_name("anon /es/").set_weight(2)?)
+                .register_task(task!(article_listing_es).set_name("anon /es/articles/"))
                 .register_task(
-                    task!(article_page_es)
-                        .set_name("anon /es/article")
+                    task!(article_es)
+                        .set_name("anon /es/articles/%")
                         .set_weight(2)?,
                 )
+                .register_task(task!(recipe_listing_es).set_name("anon /es/recipes/"))
                 .register_task(
-                    task!(recipe_page_es)
-                        .set_name("anon /es/recipe")
+                    task!(recipe_es)
+                        .set_name("anon /es/recipe/%")
                         .set_weight(4)?,
                 )
                 .register_task(task!(basic_page_es).set_name("anon /es/basicpage"))
+                .register_task(task!(page_by_nid).set_name("anon /node/%nid"))
                 .set_weight(2)?,
         )
         .set_default(GooseDefault::Host, "https://drupal-9.0.7.ddev.site/")?
@@ -285,8 +290,16 @@ async fn front_page_en(user: &GooseUser) -> GooseTaskResult {
     Ok(())
 }
 
+/// Load recipe listing in English and all static assets found on the page.
+async fn recipe_listing_en(user: &GooseUser) -> GooseTaskResult {
+    let goose = user.get("/en/recipes/").await?;
+    validate_and_load_static_assets(user, goose, "Recipes").await?;
+
+    Ok(())
+}
+
 /// Load a random recipe in English and all static assets found on the page.
-async fn recipe_page_en(user: &GooseUser) -> GooseTaskResult {
+async fn recipe_en(user: &GooseUser) -> GooseTaskResult {
     let nodes = get_nodes(&ContentType::Recipe);
     let recipe = nodes.choose(&mut rand::thread_rng());
     let goose = user.get(recipe.unwrap().url_en).await?;
@@ -295,8 +308,16 @@ async fn recipe_page_en(user: &GooseUser) -> GooseTaskResult {
     Ok(())
 }
 
+/// Load article listing in English and all static assets found on the page.
+async fn article_listing_en(user: &GooseUser) -> GooseTaskResult {
+    let goose = user.get("/en/articles/").await?;
+    validate_and_load_static_assets(user, goose, "Articles").await?;
+
+    Ok(())
+}
+
 /// Load a random article in English and all static assets found on the page.
-async fn article_page_en(user: &GooseUser) -> GooseTaskResult {
+async fn article_en(user: &GooseUser) -> GooseTaskResult {
     let nodes = get_nodes(&ContentType::Article);
     let article = nodes.choose(&mut rand::thread_rng());
     let goose = user.get(article.unwrap().url_en).await?;
@@ -344,8 +365,16 @@ pub async fn front_page_es(user: &GooseUser) -> GooseTaskResult {
     Ok(())
 }
 
+/// Load article listing in Spanish and all static assets found on the page.
+async fn recipe_listing_es(user: &GooseUser) -> GooseTaskResult {
+    let goose = user.get("/es/recipes/").await?;
+    validate_and_load_static_assets(user, goose, "Recetas").await?;
+
+    Ok(())
+}
+
 /// Load a random recipe in Spanish and all static assets found on the page.
-async fn recipe_page_es(user: &GooseUser) -> GooseTaskResult {
+async fn recipe_es(user: &GooseUser) -> GooseTaskResult {
     let nodes = get_nodes(&ContentType::Recipe);
     let recipe = nodes.choose(&mut rand::thread_rng());
     let goose = user.get(recipe.unwrap().url_es).await?;
@@ -354,8 +383,16 @@ async fn recipe_page_es(user: &GooseUser) -> GooseTaskResult {
     Ok(())
 }
 
+/// Load article listing in Spanish and all static assets found on the page.
+async fn article_listing_es(user: &GooseUser) -> GooseTaskResult {
+    let goose = user.get("/es/articles/").await?;
+    validate_and_load_static_assets(user, goose, "Artículos").await?;
+
+    Ok(())
+}
+
 /// Load a random article in Spanish and all static assets found on the page.
-async fn article_page_es(user: &GooseUser) -> GooseTaskResult {
+async fn article_es(user: &GooseUser) -> GooseTaskResult {
     let nodes = get_nodes(&ContentType::Article);
     let article = nodes.choose(&mut rand::thread_rng());
     let goose = user.get(article.unwrap().url_es).await?;
