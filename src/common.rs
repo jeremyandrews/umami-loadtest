@@ -163,6 +163,44 @@ pub fn get_nodes(content_type: &ContentType) -> Vec<Node> {
     nodes
 }
 
+/// A valid title on this website starts with "<title>foo", where "foo" is the expected
+/// title text. Returns true if the expected title is set, otherwise returns false.
+pub fn valid_title(html: &str, title: &str) -> bool {
+    if html.contains(&("<title>".to_string() + title)) {
+        return true
+    } else {
+        return false;
+    }
+}
+
+/// Finds all local static elements on the page and loads them asynchronously.
+/// This default profile only has local assets, so we can use simple patterns.
+pub async fn load_static_elements(user: &GooseUser, html: &str) {
+    // Use a regular expression to find all src=<foo> in the HTML, where foo
+    // is the URL to image and js assets.
+    // @TODO: parse HTML5 srcset= also
+    let image = Regex::new(r#"src="(.*?)""#).unwrap();
+    let mut urls = Vec::new();
+    for url in image.captures_iter(&html) {
+        if url[1].starts_with("/sites") || url[1].starts_with("/core") {
+            urls.push(url[1].to_string());
+        }
+    }
+
+    // Use a regular expression to find all href=<foo> in the HTML, where foo
+    // is the URL to css assets.
+    let css = Regex::new(r#"href="(/sites/default/files/css/.*?)""#).unwrap();
+    for url in css.captures_iter(&html) {
+        urls.push(url[1].to_string());
+    }
+
+    // Load all the static assets found on the page.
+    for asset in &urls {
+        let _ = user.get_named(asset, "static asset").await;
+    }
+
+}
+
 /// Validate the HTML response, confirming the expected title was returned, then load
 /// all static assets found on the page.
 pub async fn validate_and_load_static_assets(
@@ -176,9 +214,7 @@ pub async fn validate_and_load_static_assets(
             let headers = &response.headers().clone();
             match response.text().await {
                 Ok(html) => {
-                    // Confirm "<title>foo" (where foo is the expected title) is in the
-                    // returned HTML text.
-                    if !html.contains(&("<title>".to_string() + title)) {
+                    if !valid_title(&html, &title) {
                         return user.set_failure(
                             &format!("{}: title not found: {}", goose.request.url, title),
                             &mut goose.request,
@@ -187,26 +223,7 @@ pub async fn validate_and_load_static_assets(
                         );
                     }
 
-                    // Collect all static image and js assets found in the src= HTML tags.
-                    // @TODO: parse HTML5 srcset= also
-                    let image = Regex::new(r#"src="(.*?)""#).unwrap();
-                    let mut urls = Vec::new();
-                    for url in image.captures_iter(&html) {
-                        if url[1].starts_with("/sites") || url[1].starts_with("/core") {
-                            urls.push(url[1].to_string());
-                        }
-                    }
-
-                    // Collect all static css assets found in the link href= HTML tags.
-                    let css = Regex::new(r#"href="(/sites/default/files/css/.*?)""#).unwrap();
-                    for url in css.captures_iter(&html) {
-                        urls.push(url[1].to_string());
-                    }
-
-                    // Load all static assets on the page.
-                    for asset in &urls {
-                        let _ = user.get_named(asset, "static asset").await;
-                    }
+                    load_static_elements(user, &html).await;
                 }
                 Err(e) => {
                     return user.set_failure(
@@ -229,4 +246,13 @@ pub async fn validate_and_load_static_assets(
     }
 
     Ok(())
+}
+
+/// Use regular expression to get the value of a named form element.
+pub fn get_form_value(html: &str, name: &str) -> Option<String> {
+    let re = Regex::new(&format!(r#"name="{}" value=['"](.*?)['"]"#, name)).unwrap();
+    match re.captures(&html) {
+        Some(value) => Some(value[1].to_string()),
+        None => None,
+    }
 }
