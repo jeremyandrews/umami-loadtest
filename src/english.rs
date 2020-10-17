@@ -88,4 +88,12 @@ pub async fn anonymous_contact_form_en(user: &GooseUser) -> GooseTaskResult {
 
 // @TODO: search up content, load from results
 
-// @TODO: view listing by taxonomy term: ie /en/tags/egg
+/// Load category listing by a random term in English and all static assets found on the page.
+pub async fn term_listing_en(user: &GooseUser) -> GooseTaskResult {
+    let terms = common::get_terms();
+    let term = terms.choose(&mut rand::thread_rng());
+    let goose = user.get(term.unwrap().url_en).await?;
+    common::validate_and_load_static_assets(user, goose, term.unwrap().title_en).await?;
+
+    Ok(())
+}
