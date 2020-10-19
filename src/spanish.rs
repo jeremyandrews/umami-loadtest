@@ -65,7 +65,12 @@ pub async fn anonymous_contact_form_es(user: &GooseUser) -> GooseTaskResult {
     Ok(())
 }
 
-// @TODO: search up content, load from results
+// Pick a random word from the title of a random node and perform a search in Spanish.
+pub async fn search_es(user: &GooseUser) -> GooseTaskResult {
+    common::search(user, false).await?;
+
+    Ok(())
+}
 
 /// Load category listing by a random term in Spanish and all static assets found on the page.
 pub async fn term_listing_es(user: &GooseUser) -> GooseTaskResult {

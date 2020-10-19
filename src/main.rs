@@ -31,6 +31,7 @@ fn main() -> Result<(), GooseError> {
                 )
                 .register_task(task!(page_by_nid).set_name("anon /node/%nid"))
                 .register_task(task!(term_listing_en).set_name("anon /en term").set_weight(2)?)
+                .register_task(task!(search_en).set_name("anon /en/search"))
                 .register_task(task!(anonymous_contact_form_en).set_name("anon /en/contact")),
         )
         .register_taskset(
@@ -51,6 +52,7 @@ fn main() -> Result<(), GooseError> {
                         .set_weight(4)?,
                 )
                 .register_task(task!(term_listing_es).set_name("anon /es term").set_weight(2)?)
+                .register_task(task!(search_es).set_name("anon /es/search"))
                 .register_task(task!(anonymous_contact_form_es).set_name("anon /es/contact")),
         )
         .set_default(GooseDefault::Host, "https://drupal-9.0.7.ddev.site/")?

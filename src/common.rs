@@ -3,6 +3,8 @@ use goose::prelude::*;
 
 use regex::Regex;
 use log::info;
+use rand::seq::SliceRandom;
+use rand::prelude::IteratorRandom;
 
 /// The Umami website defines three content types.
 pub enum ContentType {
@@ -579,6 +581,164 @@ pub async fn anonymous_contact_form(user: &GooseUser, english: bool) -> GooseTas
                     // Either way, a "real" user would still load all static elements on
                     // the returned page.
                     load_static_elements(user, &html).await;
+                },
+                Err(e) => {
+                    return user.set_failure(
+                        &format!("{}: failed to parse page: {}", goose.request.url, e),
+                        &mut goose.request,
+                        Some(&headers),
+                        None,
+                    );
+                }
+            }
+        }
+        Err(e) => {
+            return user.set_failure(
+                &format!("{}: no response from server: {}", goose.request.url, e),
+                &mut goose.request,
+                None,
+                None,
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Load the search page and perform a search using one word from one of the node titles
+/// on the site.
+pub async fn search(user: &GooseUser, english: bool) -> GooseTaskResult {
+    let search_form_url = if english {
+        "/en/search/node"
+    } else {
+        "/es/search/node"
+    };
+    let mut goose = user.get(search_form_url).await?;
+
+    // We can't invoke common::validate_and_load_static_assets as while it's important
+    // to validate the page and load static elements, we then need to extra form elements
+    // from the HTML of the page. So we duplicate some of the logic, enhancing it for form
+    // processing.
+    let search_word;
+    let mut search_form;
+    match goose.response {
+        Ok(response) => {
+            // Copy the headers so we have them for logging if there are errors.
+            let headers = &response.headers().clone();
+            match response.text().await {
+                Ok(html) => {
+                    // Be sure we've properly loaded the Search page.
+                    let title = if english {
+                        "Search"
+                    } else {
+                        "Buscar"
+                    };
+                    if !valid_title(&html, title) {
+                        return user.set_failure(
+                            &format!("{}: title not found: {}", goose.request.url, title),
+                            &mut goose.request,
+                            Some(&headers),
+                            Some(&html),
+                        );
+                    }
+
+                    // Load all static elements on the page, as a real user would.
+                    load_static_elements(user, &html).await;
+
+                    // Scrape the HTML to get the values needed in order to POST to the
+                    // search form.
+                    let form_build_id = get_form_value(&html, "form_build_id");
+                    if form_build_id.is_none() {
+                        return user.set_failure(
+                            &format!("{}: no form_build_id on page", goose.request.url),
+                            &mut goose.request,
+                            Some(&headers),
+                            Some(&html),
+                        );
+                    }
+
+                    // Randomly select a content type, favoring articles and recipes.
+                    let content_types = vec![
+                        ContentType::Article,
+                        ContentType::Article,
+                        ContentType::Article,
+                        ContentType::BasicPage,
+                        ContentType::Recipe,
+                        ContentType::Recipe,
+                        ContentType::Recipe,
+                    ];
+                    let content_type = content_types.choose(&mut rand::thread_rng());
+                    // Then randomly select a node of this content type.
+                    let nodes = get_nodes(&content_type.unwrap());
+                    let page = nodes.choose(&mut rand::thread_rng());
+                    // Finally randomly select a word from the title to use in our search.
+                    let title = if english {
+                        page.unwrap().title_en
+                    } else {
+                        page.unwrap().title_es
+                    };
+                    let words = title.split_whitespace();
+                    let word = words.choose(&mut rand::thread_rng());
+                    // Save a copy of the word so we can validate the results later.
+                    search_word = word.unwrap().to_string();
+
+                    // Build search form with random word from title.
+                    let params = [
+                        ("keys", search_word.as_str()),
+                        ("form_build_id", &form_build_id.unwrap()),
+                        ("form_id", "search_form"),
+                        ("op", "Search"),
+                    ];
+                    let request_builder = user.goose_post(search_form_url).await?;
+                    search_form = user.goose_send(request_builder.form(&params), None).await?;
+
+                    // A successful search is redirected.
+                    if !search_form.request.redirected {
+                        return user.set_failure(
+                            &format!("{}: search didn't redirect", search_form.request.final_url),
+                            &mut search_form.request,
+                            Some(&headers),
+                            None,
+                        );
+                    }
+                }
+                Err(e) => {
+                    return user.set_failure(
+                        &format!("{}: failed to parse page: {}", goose.request.url, e),
+                        &mut goose.request,
+                        Some(&headers),
+                        None,
+                    );
+                }
+            }
+        }
+        Err(e) => {
+            return user.set_failure(
+                &format!("{}: no response from server: {}", goose.request.url, e),
+                &mut goose.request,
+                None,
+                None,
+            );
+        }
+    }
+
+    match search_form.response {
+        Ok(response) => {
+            // Copy the headers so we have them for logging if there are errors.
+            let headers = &response.headers().clone();
+            match response.text().await {
+                Ok(html) => {
+                    if !html.contains(&search_word) {
+                        return user.set_failure(
+                            &format!("{}: search term ({}) not on page", goose.request.url, &search_word),
+                            &mut goose.request,
+                            Some(&headers),
+                            Some(&html),
+                        );
+                    }
+                    load_static_elements(user, &html).await;
+
+                    // @TODO: get all href="" inside class="search-result__title" and load random node
                 },
                 Err(e) => {
                     return user.set_failure(
